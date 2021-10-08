@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"runtime"
 	"strconv"
 )
 
@@ -15,12 +16,17 @@ type Engine struct {
 	//request *http.Request
 	//response * http.Response
 	//writer *http.ResponseWriter
-	middlewares []Middleware
-	router      *Router
+	middlewares  []Middleware
+	router       *Router
+	panicHandler HandleFunc
 }
 
 func Default() *Engine {
-	return &Engine{router: &Router{make(map[string]HandleFunc)}, middlewares: []Middleware{}}
+	return &Engine{
+		router:       &Router{make(map[string]HandleFunc)},
+		middlewares:  []Middleware{},
+		panicHandler: doRecoverWithContext,
+	}
 }
 
 func (e *Engine) Get(path string, handler HandleFunc) {
@@ -45,8 +51,36 @@ func (e *Engine) serve(ctx *GosContext) {
 	}
 }
 
+func doRecover() {
+	if err := recover(); err != nil {
+		PrintStackTrace()
+	}
+}
+
+func doRecoverWithContext(c *GosContext) {
+	if err := recover(); err != nil {
+		PrintStackTrace()
+		c.JSON(500, H{
+			"message": "failed",
+			"err":     fmt.Sprintf("%s\n", err),
+		})
+	}
+}
+
+func PrintStackTrace() string {
+	var buf [4096]byte
+	n := runtime.Stack(buf[:], false)
+	s := string(buf[:n])
+	//logs.Infof("==> %s\n", s)
+	fmt.Printf("==> %s\n", s)
+	return s
+}
+
 func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	context := newContext(r, w, e.middlewares)
+	if e.panicHandler != nil {
+		defer e.panicHandler(context)
+	}
 	context.Next()
 
 	//for i, _ := range e.middlewares {
