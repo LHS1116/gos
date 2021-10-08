@@ -9,16 +9,18 @@ import (
 //type HandleFunc func(*http.Request, http.ResponseWriter)
 type HandleFunc func(*GosContext)
 
+type Middleware func() HandleFunc
+
 type Engine struct {
 	//request *http.Request
 	//response * http.Response
 	//writer *http.ResponseWriter
-
-	router *Router
+	middlewares []Middleware
+	router      *Router
 }
 
 func Default() *Engine {
-	return &Engine{router: &Router{make(map[string]HandleFunc)}}
+	return &Engine{router: &Router{make(map[string]HandleFunc)}, middlewares: []Middleware{}}
 }
 
 func (e *Engine) Get(path string, handler HandleFunc) {
@@ -42,9 +44,23 @@ func (e *Engine) serve(ctx *GosContext) {
 		}
 	}
 }
+
 func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	context := newContext(r, w)
+	context := newContext(r, w, e.middlewares)
+	context.Next()
+
+	//for i, _ := range e.middlewares {
+	//	m := e.middlewares[i]
+	//	m()(context)
+	//
+	//}
+
 	e.serve(context)
+}
+
+func (e *Engine) Use(middleware Middleware) *Engine {
+	e.middlewares = append(e.middlewares, middleware)
+	return e
 }
 
 func (e *Engine) Run(port int) error {

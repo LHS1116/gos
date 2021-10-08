@@ -6,14 +6,21 @@ import (
 )
 
 type GosContext struct {
-	Request *http.Request
-	Writer  http.ResponseWriter
-	Status  int
+	Request     *http.Request
+	Writer      http.ResponseWriter
+	Status      int
+	index       int
+	middlewares []Middleware
 }
 type H map[string]interface{}
 
-func newContext(r *http.Request, w http.ResponseWriter) *GosContext {
-	return &GosContext{r, w, 0}
+func newContext(r *http.Request, w http.ResponseWriter, middlewares []Middleware) *GosContext {
+	return &GosContext{
+		Request:     r,
+		Writer:      w,
+		index:       -1,
+		middlewares: middlewares,
+	}
 }
 
 func (c *GosContext) Query(key string) string {
@@ -32,6 +39,10 @@ func (c *GosContext) DefaultQuery(key string, defaultValue string) string {
 	return v[0]
 }
 
+func (c *GosContext) FullPath() string {
+	return c.Request.Host + c.Request.RequestURI
+}
+
 func (c *GosContext) SetHeader(k, v string) {
 	c.Writer.Header().Set(k, v)
 }
@@ -39,6 +50,14 @@ func (c *GosContext) SetHeader(k, v string) {
 func (c *GosContext) SetStatus(code int) {
 	c.Writer.WriteHeader(code)
 	c.Status = code
+}
+
+func (c *GosContext) Next() {
+	c.index++
+	for c.index < len(c.middlewares) {
+		c.middlewares[c.index]()(c)
+		c.index++
+	}
 }
 
 func (c *GosContext) JSON(code int, data interface{}) {
