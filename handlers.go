@@ -15,3 +15,23 @@ func Test(c *web.GosContext) {
 		"params": []string{param1, param2},
 	})
 }
+
+func TestQQ(c *web.GosContext) {
+	param := c.PathParam("qq", "QQ NOT FOUND")
+	c.JSON(200, web.H{
+		"title":  "TestQQ",
+		"data":   "success",
+		"params": param,
+	})
+
+}
+
+func TestName(c *web.GosContext) {
+	param := c.PathParam("name", "Name NOT FOUND")
+	c.JSON(200, web.H{
+		"title":  "TestName",
+		"data":   "success",
+		"params": param,
+	})
+
+}
