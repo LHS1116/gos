@@ -11,6 +11,7 @@ type GosContext struct {
 	Status      int
 	index       int
 	middlewares []Middleware
+	pathParams  map[string]string
 }
 type H map[string]interface{}
 
@@ -37,6 +38,16 @@ func (c *GosContext) DefaultQuery(key string, defaultValue string) string {
 		return defaultValue
 	}
 	return v[0]
+}
+
+func (c *GosContext) PathParam(key string, defaultValue string) string {
+	if c.pathParams != nil {
+		v, ok := c.pathParams[key]
+		if ok {
+			return v
+		}
+	}
+	return defaultValue
 }
 
 func (c *GosContext) FullPath() string {
