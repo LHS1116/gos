@@ -7,45 +7,50 @@ import (
 	"strconv"
 )
 
-//type HandleFunc func(*http.Request, http.ResponseWriter)
 type HandleFunc func(*GosContext)
 
 type Middleware func() HandleFunc
+
+var engine *Engine
 
 type Engine struct {
 	//request *http.Request
 	//response * http.Response
 	//writer *http.ResponseWriter
+	RouterGroup
 	middlewares  []Middleware
 	router       *Router
 	panicHandler HandleFunc
 }
 
 func Default() *Engine {
-	return &Engine{
-		router:       &Router{make(map[string]*Node), make(map[string]HandleFunc)},
-		middlewares:  []Middleware{},
-		panicHandler: doRecoverWithContext,
+	if engine == nil {
+		engine = &Engine{
+			router:       &Router{make(map[string]*Node), make(map[string]HandleFunc)},
+			middlewares:  []Middleware{},
+			panicHandler: doRecoverWithContext,
+		}
 	}
+	return engine
 }
 
-func (e *Engine) Get(path string, handler HandleFunc) {
-	e.router.addRoute("GET", path, handler)
+func (r *RouterGroup) Get(path string, handler HandleFunc) {
+	r.addRoute("GET", path, handler)
 }
 
-func (e *Engine) Post(path string, handler HandleFunc) {
-	e.router.addRoute("POST", path, handler)
+func (r *RouterGroup) Post(path string, handler HandleFunc) {
+	r.addRoute("POST", path, handler)
 }
 
-func (e *Engine) serve(ctx *GosContext) {
-	r := ctx.Request
-	//key := r.Method + ":" + r.URL.Path
-	fmt.Println("URL: " + r.URL.Path)
-	if handler, pathParams := e.router.getHandler(r.Method, r.URL.Path); handler != nil {
+func (r *Engine) serve(ctx *GosContext) {
+	req := ctx.Request
+	//key := req.Method + ":" + req.URL.Path
+	fmt.Println("URL: " + req.URL.Path)
+	if handler, pathParams := r.router.getHandler(req.Method, req.URL.Path); handler != nil {
 		ctx.pathParams = pathParams
 		handler(ctx)
 	} else {
-		_, err := fmt.Fprintf(ctx.Writer, "404 NOT FOUND: %s\n", r.URL)
+		_, err := fmt.Fprintf(ctx.Writer, "404 NOT FOUND: %s\n", req.URL)
 		if err != nil {
 			return
 		}
@@ -94,9 +99,9 @@ func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	e.serve(context)
 }
 
-func (e *Engine) Use(middleware Middleware) *Engine {
-	e.middlewares = append(e.middlewares, middleware)
-	return e
+func (r *RouterGroup) Use(middleware Middleware) *RouterGroup {
+	r.middlewares = append(r.middlewares, middleware)
+	return r
 }
 
 func (e *Engine) Run(port int) error {
