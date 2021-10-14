@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -28,9 +29,23 @@ func (n Node) String() string {
 	}
 }
 
+type IRouter interface {
+	Get(string, HandleFunc)
+	Post(string, HandleFunc)
+	Use(middleware Middleware) *IRouter
+	Group(path string, handler ...HandleFunc) *RouterGroup
+}
+
 type Router struct {
 	roots    map[string]*Node
 	handlers map[string]HandleFunc
+}
+
+type RouterGroup struct {
+	prefix      string
+	children    []*RouterGroup
+	middlewares []Middleware
+	engine      *Engine
 }
 
 func (r *Router) insert(method string, path string, handler HandleFunc) {
@@ -153,11 +168,28 @@ func (root *Node) search(index int, patterns []string) (*Node, int) {
 
 }
 
+func (r *RouterGroup) Group(path string, handler ...HandleFunc) *RouterGroup {
+	//e.router.addRoute("GET", path, handler)
+	newGroup := &RouterGroup{
+		prefix: r.prefix + path,
+		engine: r.engine,
+	}
+	r.engine.children = append(r.engine.children, newGroup)
+	return newGroup
+}
+
+func (r *RouterGroup) addRoute(method, path string, handler HandleFunc) *RouterGroup {
+	//e.router.addRoute("GET", path, handler)
+	pattern := r.prefix + path
+	log.Printf("Route %4s - %s", method, pattern)
+	r.engine.router.addRoute(method, pattern, handler)
+	return r
+}
+
 func (r *Router) addRoute(method string, path string, handler HandleFunc) {
 	r.insert(method, path, handler)
 }
 
 func (r *Router) getHandler(method, path string) (HandleFunc, map[string]string) {
-
 	return r.find(method, path)
 }
